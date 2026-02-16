@@ -1,4 +1,4 @@
-# telegram-post
+# telegram-post-cli
 
 CLI utility for posting messages to Telegram channels via Bot API.
 
@@ -8,33 +8,42 @@ CLI utility for posting messages to Telegram channels via Bot API.
 2. Copy the `Bot Token`
 3. Add the bot as an **administrator** to your public channel
 
-## Setup
+## Install & run
 
 ```bash
-cp .env.example .env
-# Fill in BOT_TOKEN
+# Run directly (no install needed)
+uvx telegram-post-cli@latest --channel myChannel "Hello Telegram!"
+
+# Or install globally
+uv tool install telegram-post-cli
 ```
+
+On first run the tool will prompt for your Bot Token and save it to
+`~/.config/telegram-post-cli/config.json`.
 
 ## Usage
 
 ```bash
 # Inline text
-uv run telegram-post --channel myChannel "Hello Telegram!"
+telegram-post-cli --channel myChannel "Hello Telegram!"
 
 # With image
-uv run telegram-post --channel myChannel --image photo.jpg "Caption"
+telegram-post-cli --channel myChannel --image photo.jpg "Caption"
 
 # Image without caption
-uv run telegram-post --channel myChannel --image photo.jpg
+telegram-post-cli --channel myChannel --image photo.jpg
 
 # From file
-uv run telegram-post --channel myChannel --from-file draft.txt
+telegram-post-cli --channel myChannel --from-file draft.txt
 
 # With parse mode
-uv run telegram-post --channel myChannel --parse-mode HTML "<b>Bold</b>"
+telegram-post-cli --channel myChannel --parse-mode HTML "<b>Bold</b>"
 
 # Interactive input (Ctrl+D to send)
-uv run telegram-post --channel myChannel
+telegram-post-cli --channel myChannel
+
+# Clear saved credentials and re-prompt
+telegram-post-cli --channel myChannel --reset-keys "Hello again!"
 ```
 
 The `--channel` flag accepts a channel username (with or without `@`).

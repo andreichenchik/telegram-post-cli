@@ -5,13 +5,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tg.cli import main
-from tg.client import PostResult, TelegramClient, normalize_channel
+from telegram_post.cli import main
+from telegram_post.client import PostResult, TelegramClient, normalize_channel
+
+from helpers import DictConfigStore
 
 
 @pytest.fixture
 def client() -> TelegramClient:
     return TelegramClient(bot_token="123:FAKE")
+
+
+def _base_config() -> DictConfigStore:
+    """Config with bot_token pre-filled."""
+    return DictConfigStore({"bot_token": "123:FAKE"})
 
 
 # --- TelegramClient.send_message ---
@@ -142,26 +149,22 @@ class TestNormalizeChannel:
 
 
 class TestCLIOutput:
-    @patch("tg.cli.TelegramClient")
-    @patch("tg.cli.dotenv.load_dotenv")
-    @patch.dict("os.environ", {"BOT_TOKEN": "123:FAKE"})
+    @patch("telegram_post.cli.TelegramClient")
     def test_prints_url(
-        self, _load: object, mock_client_cls: MagicMock,
+        self, mock_client_cls: MagicMock,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         mock_client = mock_client_cls.return_value
         mock_client.send_message.return_value = PostResult(
             message_id=42, url="https://t.me/mychan/42",
         )
-        main(["--channel", "mychan", "Hello!"])
+        main(["--channel", "mychan", "Hello!"], _config=_base_config())
         out = capsys.readouterr().out
         assert "https://t.me/mychan/42" in out
 
-    @patch("tg.cli.TelegramClient")
-    @patch("tg.cli.dotenv.load_dotenv")
-    @patch.dict("os.environ", {"BOT_TOKEN": "123:FAKE"})
+    @patch("telegram_post.cli.TelegramClient")
     def test_sends_photo_with_caption(
-        self, _load: object, mock_client_cls: MagicMock,
+        self, mock_client_cls: MagicMock,
         tmp_path: pathlib.Path,
     ) -> None:
         img = tmp_path / "photo.jpg"
@@ -171,16 +174,14 @@ class TestCLIOutput:
         mock_client.send_photo.return_value = PostResult(
             message_id=55, url="https://t.me/mychan/55",
         )
-        main(["--channel", "mychan", "--image", str(img), "Caption"])
+        main(["--channel", "mychan", "--image", str(img), "Caption"], _config=_base_config())
         mock_client.send_photo.assert_called_once_with(
             "@mychan", img, caption="Caption", parse_mode=None,
         )
 
-    @patch("tg.cli.TelegramClient")
-    @patch("tg.cli.dotenv.load_dotenv")
-    @patch.dict("os.environ", {"BOT_TOKEN": "123:FAKE"})
+    @patch("telegram_post.cli.TelegramClient")
     def test_sends_photo_without_caption(
-        self, _load: object, mock_client_cls: MagicMock,
+        self, mock_client_cls: MagicMock,
         tmp_path: pathlib.Path,
     ) -> None:
         img = tmp_path / "photo.jpg"
@@ -190,44 +191,40 @@ class TestCLIOutput:
         mock_client.send_photo.return_value = PostResult(
             message_id=56, url="https://t.me/mychan/56",
         )
-        main(["--channel", "mychan", "--image", str(img)])
+        main(["--channel", "mychan", "--image", str(img)], _config=_base_config())
         mock_client.send_photo.assert_called_once_with(
             "@mychan", img, caption=None, parse_mode=None,
         )
 
-    @patch("tg.cli.TelegramClient")
-    @patch("tg.cli.dotenv.load_dotenv")
-    @patch.dict("os.environ", {"BOT_TOKEN": "123:FAKE"})
+    @patch("telegram_post.cli.TelegramClient")
     def test_passes_parse_mode(
-        self, _load: object, mock_client_cls: MagicMock,
+        self, mock_client_cls: MagicMock,
     ) -> None:
         mock_client = mock_client_cls.return_value
         mock_client.send_message.return_value = PostResult(
             message_id=1, url="https://t.me/ch/1",
         )
-        main(["--channel", "ch", "--parse-mode", "HTML", "<b>Bold</b>"])
+        main(["--channel", "ch", "--parse-mode", "HTML", "<b>Bold</b>"], _config=_base_config())
         mock_client.send_message.assert_called_once_with(
             "@ch", "<b>Bold</b>", parse_mode="HTML",
         )
 
 
 class TestCLIValidation:
-    @patch("tg.cli.dotenv.load_dotenv")
-    @patch.dict("os.environ", {"BOT_TOKEN": "123:FAKE"})
-    def test_rejects_empty_text(self, *_: object) -> None:
+    def test_rejects_empty_text(self) -> None:
         with pytest.raises(SystemExit), patch("sys.stdin") as mock_stdin:
             mock_stdin.read.return_value = ""
-            main(["--channel", "ch"])
+            main(["--channel", "ch"], _config=_base_config())
 
-    @patch("tg.cli.dotenv.load_dotenv")
-    @patch.dict("os.environ", {"BOT_TOKEN": ""})
-    def test_rejects_missing_bot_token(self, *_: object) -> None:
+    @patch("builtins.input", return_value="")
+    def test_rejects_missing_bot_token(self, _input: object) -> None:
+        config = DictConfigStore()
         with pytest.raises(SystemExit):
-            main(["--channel", "ch", "hello"])
+            main(["--channel", "ch", "hello"], _config=config)
 
     def test_rejects_missing_channel(self) -> None:
         with pytest.raises(SystemExit):
-            main(["hello"])
+            main(["hello"], _config=_base_config())
 
 
 # --- helpers ---

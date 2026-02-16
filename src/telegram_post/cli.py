@@ -1,15 +1,11 @@
 """CLI entry-point for telegram-post."""
 
 import argparse
-import os
 import pathlib
 import sys
 
-import dotenv
-
-from tg.client import TelegramClient, normalize_channel
-
-_ENV_PATH = pathlib.Path.cwd() / ".env"
+from telegram_post.client import TelegramClient, normalize_channel
+from telegram_post.config import ConfigStore, JsonConfigStore, prompt_if_missing
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -36,6 +32,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=["HTML", "Markdown", "MarkdownV2"],
         help="Message parse mode",
     )
+    parser.add_argument(
+        "--reset-keys",
+        action="store_true",
+        help="Clear all saved credentials and re-prompt from scratch",
+    )
     return parser.parse_args(argv)
 
 
@@ -48,16 +49,26 @@ def _read_post_text(args: argparse.Namespace) -> str:
     return sys.stdin.read().strip()
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None, *, _config: ConfigStore | None = None) -> None:
     args = _parse_args(argv)
+    config = _config or JsonConfigStore()
 
-    dotenv.load_dotenv(_ENV_PATH)
+    if args.reset_keys:
+        config.remove(["bot_token"])
 
-    bot_token = os.getenv("BOT_TOKEN", "")
-    if not bot_token:
-        print("BOT_TOKEN must be set in .env", file=sys.stderr)
-        sys.exit(1)
+    if not config.get("bot_token"):
+        print(
+            "\n"
+            "First-time setup\n"
+            "================\n"
+            "You need a Telegram Bot Token.\n"
+            "\n"
+            "1. Open https://t.me/BotFather\n"
+            "2. Send /newbot and follow the prompts\n"
+            "3. Copy the Bot Token below\n",
+        )
 
+    bot_token = prompt_if_missing(config, "bot_token", "Bot Token")
     channel = normalize_channel(args.channel)
 
     if args.image:
